@@ -1,0 +1,135 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        (request.auth.token.admin == true ||
+         request.auth.token.email in [
+           'admin@topclean-service.de',
+           'mert.kaya@topclean-service.de',
+           'info@blumeiraqstore.com',
+           'admin@topclean.de'
+         ] ||
+         request.auth.uid in [
+           'RcYxSflDcOdTaA1BRjnEfH9fPON2',
+           'iLBDkB6aePhGHLV9QCjTOlVyE4A3'
+         ]);
+    }
+
+    function deviceId() {
+      return request.auth.token.deviceId;
+    }
+
+    function deviceAllowed() {
+      return deviceId() != null &&
+        exists(/databases/$(database)/documents/deviceAccess/$(deviceId())) &&
+        get(/databases/$(database)/documents/deviceAccess/$(deviceId())).data.allowed == true;
+    }
+
+    // Invites: sadece admin
+    match /invites/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // Cihaz yetkileri: admin yazar, cihaz sahibi okur
+    match /deviceAccess/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Davet kaydı: herkes create, admin okur/yazar, personel kendi kaydını okur/günceller
+    match /deviceRequests/{id} {
+      allow create: if true;
+      allow read: if true;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Kullanıcılar: admin okur/yazar, kullanıcı kendi dokümanını okur
+    match /users/{id} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == id);
+      allow write, update, delete: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == id;
+    }
+
+    // Raporlar: admin her şeyi okur/yazar, personel SADECE kendi deviceId'sine ait kayıtları okur/yazar
+    match /reports/{id} {
+      // Okuma: Admin veya kendi cihazına ait kayıt
+      allow read: if isAdmin() ||
+        (resource.data.deviceId != null &&
+          exists(/databases/$(database)/documents/deviceAccess/$(resource.data.deviceId)) &&
+          get(/databases/$(database)/documents/deviceAccess/$(resource.data.deviceId)).data.allowed == true);
+      
+      // Oluşturma: Admin veya yetkili cihaz (deviceId zorunlu)
+      allow create: if isAdmin() ||
+        (request.resource.data.deviceId != null &&
+          request.resource.data.deviceId is string &&
+          request.resource.data.date != null &&
+          request.resource.data.date is string &&
+          exists(/databases/$(database)/documents/deviceAccess/$(request.resource.data.deviceId)) &&
+          get(/databases/$(database)/documents/deviceAccess/$(request.resource.data.deviceId)).data.allowed == true);
+      
+      // Güncelleme: Admin veya kendi cihazına ait kayıt (deviceId değiştirilemez)
+      allow update: if isAdmin() ||
+        (resource.data.deviceId != null &&
+          request.resource.data.deviceId == resource.data.deviceId &&
+          exists(/databases/$(database)/documents/deviceAccess/$(resource.data.deviceId)) &&
+          get(/databases/$(database)/documents/deviceAccess/$(resource.data.deviceId)).data.allowed == true);
+      
+      // Silme: Sadece admin
+      allow delete: if isAdmin();
+    }
+
+    // Bildirimler: personel oluşturabilir, admin okur/yazar
+    match /notifications/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Tatil günleri: admin yazar, herkes okur
+    match /holidays/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // İzin talepleri: personel oluşturabilir, admin okur/yazar/günceller
+    match /leaveRequests/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Destek talepleri: personel oluşturabilir ve kendi taleplerini okuyabilir, admin tümünü okur/yazar
+    match /supportRequests/{id} {
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Konum takibi: personel kendi deviceId'sine ait verileri oluşturabilir, admin hepsini okur
+    match /locationTracking/{id} {
+      allow create: if isAdmin() ||
+        (request.resource.data.deviceId != null &&
+          request.resource.data.deviceId is string &&
+          request.resource.data.latitude != null &&
+          request.resource.data.longitude != null &&
+          exists(/databases/$(database)/documents/deviceAccess/$(request.resource.data.deviceId)) &&
+          get(/databases/$(database)/documents/deviceAccess/$(request.resource.data.deviceId)).data.allowed == true);
+      allow read: if isAdmin() ||
+        (resource.data.deviceId != null &&
+          exists(/databases/$(database)/documents/deviceAccess/$(resource.data.deviceId)) &&
+          get(/databases/$(database)/documents/deviceAccess/$(resource.data.deviceId)).data.allowed == true);
+      allow update, delete: if isAdmin();
+    }
+
+    // Diğer her şey kapalı
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

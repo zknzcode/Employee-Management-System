@@ -1,0 +1,19 @@
+{
+  "projects": {
+    "default": "top-clean-service"
+  },
+  "targets": {
+    "top-clean-service": {
+      "hosting": {
+        "admin": [
+          "top-clean-admin"
+        ]
+      }
+    }
+  }
+}
+
+
+
+
+
