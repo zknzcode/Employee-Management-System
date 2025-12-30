@@ -20,9 +20,9 @@ const cfg = (() => {
 const smtp = {
   host: process.env.SMTP_HOST || cfg.host || 'smtp.gmail.com',
   port: Number(process.env.SMTP_PORT || cfg.port || 587),
-  user: process.env.SMTP_USER || cfg.user || 'info@blumeiraqstore.com',
-  pass: process.env.SMTP_PASS || cfg.pass || 'iobs zsts ozey evie',
-  from: process.env.SMTP_FROM || cfg.from || 'TOP Clean <info@blumeiraqstore.com>',
+  user: process.env.SMTP_USER || cfg.user || 'your-email@example.com',
+  pass: process.env.SMTP_PASS || cfg.pass || 'YOUR_APP_PASSWORD',
+  from: process.env.SMTP_FROM || cfg.from || 'Your App <your-email@example.com>',
 }
 
 let transporter
@@ -47,15 +47,16 @@ exports.sendInvite = functions
   .https.onCall(async (data, context) => {
     const emailClaim = context.auth?.token?.email
     const isAdminClaim = context.auth?.token?.role === 'admin' || context.auth?.token?.admin === true
-    const whitelist = ['admin@topclean-service.de', 'mert.kaya@topclean-service.de', 'info@blumeiraqstore.com']
-    const uidWhitelist = ['RcYxSflDcOdTaA1BRjnEfH9fPON2']
+    // TODO: Replace with your admin whitelist
+    const whitelist = [] // Add your admin emails here
+    const uidWhitelist = [] // Add your admin UIDs here
     const isWhitelisted = (emailClaim && whitelist.includes(emailClaim)) || (context.auth?.uid && uidWhitelist.includes(context.auth.uid))
     if (!context.auth || (!isAdminClaim && !isWhitelisted)) {
       throw new functions.https.HttpsError('permission-denied', 'Admin required')
     }
 
     const to = data?.to
-    const link = data?.link || 'https://top-clean-1.web.app'
+    const link = data?.link || 'https://your-app.web.app'
     if (!to) {
       throw new functions.https.HttpsError('invalid-argument', 'to required')
     }
@@ -67,13 +68,13 @@ exports.sendInvite = functions
     await getTransporter().sendMail({
       from: smtp.from || smtp.user,
       to,
-      subject: 'TOP Clean - Einladung zur Registrierung',
-      text: `Sie wurden zu TOP Clean eingeladen. Bitte registrieren Sie sich hier: ${link}`,
+      subject: 'Your App - Einladung zur Registrierung',
+      text: `Sie wurden zu Your App eingeladen. Bitte registrieren Sie sich hier: ${link}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #00a4e4;">TOP Clean</h2>
+          <h2 style="color: #00a4e4;">Your App</h2>
           <p>Guten Tag,</p>
-          <p>Sie wurden zur TOP Clean Personal-App eingeladen.</p>
+          <p>Sie wurden zur Your App Personal-App eingeladen.</p>
           <p>Bitte klicken Sie auf den folgenden Link, um sich zu registrieren:</p>
           <p style="margin: 20px 0;">
             <a href="${link}" style="background: #00a4e4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
@@ -82,7 +83,7 @@ exports.sendInvite = functions
           </p>
           <p style="color: #666; font-size: 12px;">Oder kopieren Sie diesen Link: ${link}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="color: #999; font-size: 11px;">TOP Clean Service</p>
+          <p style="color: #999; font-size: 11px;">Your App Service</p>
         </div>
       `,
     })

@@ -76,7 +76,7 @@ type Holiday = {
 
 const TEXT: Record<Lang, any> = {
   de: {
-    topbarTitle: 'TOP Clean',
+    topbarTitle: 'Your App',
     topbarSubtitle: 'Personal • Mobil',
     heroHeadline: 'Arbeitszeit schnell erfassen.',
     chipTarget: 'Ziel',
@@ -669,6 +669,9 @@ function MainApp() {
   const [locationCapturing, setLocationCapturing] = useState(false)
   const [_locationStatus, setLocationStatus] = useState<'idle' | 'capturing' | 'success' | 'error'>('idle')
   const locationTrackingIntervalRef = useRef<number | null>(null)
+  const locationWatchIdRef = useRef<number | null>(null)
+  const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
+  const autoStartScheduledRef = useRef<number | null>(null)
   const [startTimeInput, setStartTimeInput] = useState('')
   const [endTimeInput, setEndTimeInput] = useState('')
   const [workActionMsg, setWorkActionMsg] = useState<string | null>(null)
@@ -1134,6 +1137,15 @@ function MainApp() {
             startLocation: data.startLocation ?? null,
             endLocation: data.endLocation ?? null,
             isOpen: data.isOpen ?? false,
+            // Mesai alanları
+            overtimeStartTime: data.overtimeStartTime ?? null,
+            overtimeEndTime: data.overtimeEndTime ?? null,
+            overtimeStartSubmittedAt: data.overtimeStartSubmittedAt?.toDate ? data.overtimeStartSubmittedAt.toDate() : null,
+            overtimeEndSubmittedAt: data.overtimeEndSubmittedAt?.toDate ? data.overtimeEndSubmittedAt.toDate() : null,
+            overtimeStartLocation: data.overtimeStartLocation ?? null,
+            overtimeEndLocation: data.overtimeEndLocation ?? null,
+            isOvertimeOpen: data.isOvertimeOpen ?? false,
+            hasOvertime: data.hasOvertime ?? false,
           }
         })
         // Client-side sıralama (index sorunu nedeniyle)
@@ -1160,54 +1172,183 @@ function MainApp() {
     return () => unsub()
   }, [db, todayIso, deviceAllowed, deviceId, lang])
 
-  // Sürekli konum takibi - iş başladığında aktif
+  // Service Worker kaydı
   useEffect(() => {
-    // Önce mevcut interval'i temizle
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          console.log('✅ Service Worker registered:', registration)
+          swRegistrationRef.current = registration
+          
+          // Service Worker'dan gelen mesajları dinle
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data.type === 'LOCATION_UPDATE' && deviceId && todayOpenReport) {
+              const { latitude, longitude, accuracy, timestamp } = event.data.data
+              addDoc(collection(db, 'locationTracking'), {
+                deviceId,
+                reportId: todayOpenReport.id,
+                date: todayIso,
+                latitude,
+                longitude,
+                accuracy,
+                timestamp: serverTimestamp(),
+                capturedAt: timestamp,
+              }).catch((e) => {
+                console.error('❌ Location save error:', e)
+              })
+            }
+          })
+        })
+        .catch((error) => {
+          console.error('❌ Service Worker registration failed:', error)
+        })
+    }
+  }, [])
+
+  // Her gün saat 7'de otomatik başlatma
+  useEffect(() => {
+    if (!deviceAllowed || !deviceId) return
+
+    const scheduleAutoStart = () => {
+      const now = new Date()
+      const today7AM = new Date(now)
+      today7AM.setHours(7, 0, 0, 0)
+      
+      // Eğer saat 7'yi geçtiyse, yarın saat 7'yi hedefle
+      if (now > today7AM) {
+        today7AM.setDate(today7AM.getDate() + 1)
+      }
+      
+      const msUntil7AM = today7AM.getTime() - now.getTime()
+      
+      console.log(`⏰ Auto-start scheduled for ${today7AM.toLocaleString()}`)
+      
+      autoStartScheduledRef.current = window.setTimeout(async () => {
+        const todayReport = reports.find((r) => r.date === todayIso && r.isOpen)
+        if (!todayReport && deviceAllowed && deviceId) {
+          console.log('🚀 Auto-starting work at 7 AM')
+          try {
+            const now = new Date()
+            const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+            const location = await captureLocation()
+            const reportData = {
+              date: todayIso,
+              totalHours: 0,
+              overtimeHours: 0,
+              status: 'arbeit',
+              note: '',
+              deviceId,
+              createdAt: serverTimestamp(),
+              startTime: currentTime,
+              endTime: null,
+              startSubmittedAt: serverTimestamp(),
+              endSubmittedAt: null,
+              startLocation: location ? {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy,
+                timestamp: new Date().toISOString(),
+              } : null,
+              endLocation: null,
+              isOpen: true,
+            }
+            await addDoc(collection(db, 'reports'), reportData)
+            console.log('✅ Auto-started work at 7 AM')
+          } catch (e) {
+            console.error('❌ Auto-start error:', e)
+          }
+        }
+        scheduleAutoStart()
+      }, msUntil7AM)
+    }
+    
+    scheduleAutoStart()
+    
+    return () => {
+      if (autoStartScheduledRef.current) {
+        clearTimeout(autoStartScheduledRef.current)
+      }
+    }
+  }, [deviceAllowed, deviceId, todayIso, reports])
+
+  // Sürekli konum takibi - iş başladığında veya mesai aktifken
+  useEffect(() => {
+    // Önce mevcut takibi durdur
+    if (locationWatchIdRef.current !== null && navigator.geolocation) {
+      console.log('🛑 Clearing existing location watch...')
+      navigator.geolocation.clearWatch(locationWatchIdRef.current)
+      locationWatchIdRef.current = null
+    }
+    
     if (locationTrackingIntervalRef.current) {
-      console.log('🛑 Clearing existing location tracking interval...')
       window.clearInterval(locationTrackingIntervalRef.current)
       locationTrackingIntervalRef.current = null
     }
 
-    if (!deviceAllowed || !deviceId || !todayOpenReport) {
-      // İş başlamadıysa veya cihaz yetkili değilse takibi durdur
-      console.log('⏸️ Location tracking paused - missing requirements')
+    // İş başladı mı veya mesai aktif mi kontrol et
+    const isWorkActive = todayOpenReport && todayOpenReport.isOpen
+    const isOvertimeActive = todayOpenReport && todayOpenReport.isOvertimeOpen
+
+    if (!deviceAllowed || !deviceId || (!isWorkActive && !isOvertimeActive)) {
+      console.log('⏸️ Location tracking paused - work not active')
+      if (swRegistrationRef.current?.active) {
+        swRegistrationRef.current.active.postMessage({ type: 'STOP_TRACKING' })
+      }
       return
     }
 
-    // İş başladı, konum takibini başlat
-    console.log('📍 Starting location tracking for device:', deviceId, 'Report:', todayOpenReport.id)
+    console.log('📍 Starting location tracking for device:', deviceId, 'Report:', todayOpenReport?.id, 'Overtime:', isOvertimeActive)
     
-    // İlk konumu hemen kaydet
-    captureLocation().then((location) => {
-      if (location && deviceId && todayOpenReport) {
-        addDoc(collection(db, 'locationTracking'), {
+    // Service Worker'ı başlat (arka planda çalışır)
+    if (swRegistrationRef.current?.active && deviceId && todayOpenReport) {
+      swRegistrationRef.current.active.postMessage({ 
+        type: 'START_TRACKING',
+        data: {
           deviceId,
           reportId: todayOpenReport.id,
           date: todayIso,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          timestamp: serverTimestamp(),
-          capturedAt: new Date().toISOString(),
-        }).then(() => {
-          console.log('✅ First location saved:', location.latitude, location.longitude)
-        }).catch((e) => {
-          console.error('❌ First location save error:', e)
-        })
-      }
-    }).catch((e) => {
-      console.error('❌ First location capture error:', e)
-    })
+        }
+      })
+    }
     
-    // Her 30 saniyede bir konum kaydet (canlı takip)
+    // watchPosition ile sürekli takip (GPS gibi)
+    if (navigator.geolocation) {
+      locationWatchIdRef.current = navigator.geolocation.watchPosition(
+        async (position) => {
+          if (deviceId && todayOpenReport) {
+            try {
+              await addDoc(collection(db, 'locationTracking'), {
+                deviceId,
+                reportId: todayOpenReport.id,
+                date: todayIso,
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: serverTimestamp(),
+                capturedAt: new Date().toISOString(),
+              })
+            } catch (e) {
+              console.error('❌ Location save error:', e)
+            }
+          }
+        },
+        (error) => {
+          console.error('❌ Location watch error:', error)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0,
+        }
+      )
+    }
+    
+    // Yedek olarak her 30 saniyede bir konum kaydet
     const interval = window.setInterval(async () => {
       try {
-        console.log('📍 [Interval] Capturing location...')
         const location = await captureLocation()
         if (location && deviceId && todayOpenReport) {
-          console.log('📍 [Interval] Location captured:', location.latitude, location.longitude)
-          // Konum verilerini Firestore'a kaydet
           await addDoc(collection(db, 'locationTracking'), {
             deviceId,
             reportId: todayOpenReport.id,
@@ -1218,27 +1359,32 @@ function MainApp() {
             timestamp: serverTimestamp(),
             capturedAt: new Date().toISOString(),
           })
-          console.log('✅ [Interval] Location saved to Firestore')
-        } else {
-          console.warn('⚠️ [Interval] No location captured or missing data', { location: !!location, deviceId: !!deviceId, report: !!todayOpenReport })
         }
       } catch (e) {
-        console.error('❌ [Interval] Location tracking error:', e)
+        console.error('❌ Interval location error:', e)
       }
-    }, 30 * 1000) // 30 saniye - canlı takip
+    }, 30 * 1000)
     
     locationTrackingIntervalRef.current = interval
-    console.log('✅ Location tracking interval started:', interval, 'Every 30 seconds')
 
     return () => {
       console.log('🧹 Cleanup: Stopping location tracking...')
+      
+      if (locationWatchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(locationWatchIdRef.current)
+        locationWatchIdRef.current = null
+      }
+      
       if (locationTrackingIntervalRef.current) {
         window.clearInterval(locationTrackingIntervalRef.current)
         locationTrackingIntervalRef.current = null
-        console.log('✅ Location tracking interval cleared')
+      }
+      
+      if (swRegistrationRef.current?.active) {
+        swRegistrationRef.current.active.postMessage({ type: 'STOP_TRACKING' })
       }
     }
-  }, [deviceAllowed, deviceId, todayOpenReport?.id, todayIso, db])
+  }, [deviceAllowed, deviceId, todayOpenReport?.id, todayOpenReport?.isOpen, todayOpenReport?.isOvertimeOpen, todayIso, db])
 
   const handleSave = async () => {
     // Güvenlik kontrolü
@@ -1804,7 +1950,7 @@ function MainApp() {
   const renderHome = () => (
     <div className="stack">
       <section className="panel hero">
-        <div className="hero__brand">TOP Clean • Service</div>
+        <div className="hero__brand">Your App • Service</div>
         <div className="hero__headline">{t.heroHeadline}</div>
         <div className="hero__meta">{todayLabel}</div>
       </section>
