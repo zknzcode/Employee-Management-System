@@ -34,11 +34,11 @@ const sendMail = async ({ to, link }) => {
   })
 
   await transporter.sendMail({
-    from: `"${process.env.FROM_NAME || 'TOP Clean'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    from: `"${process.env.FROM_NAME || 'Your App'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
     to,
-    subject: 'TOP Clean daveti',
-    text: `Merhaba,\n\nDavet bağlantınız: ${link}\n\nSelamlar,\nTOP Clean`,
-    html: `<p>Merhaba,</p><p>Davet bağlantınız: <a href="${link}">${link}</a></p><p>Selamlar,<br/>TOP Clean</p>`,
+    subject: 'Your App daveti',
+    text: `Merhaba,\n\nDavet bağlantınız: ${link}\n\nSelamlar,\nYour App`,
+    html: `<p>Merhaba,</p><p>Davet bağlantınız: <a href="${link}">${link}</a></p><p>Selamlar,<br/>Your App</p>`,
   })
 }
 

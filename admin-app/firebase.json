@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "top-clean-admin",
+    "site": "your-admin-site",
     "public": "dist",
     "ignore": [
       "firebase.json",
@@ -15,6 +15,9 @@
     ]
   }
 }
+
+
+
 
 
 

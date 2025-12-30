@@ -2,22 +2,23 @@ const { initializeApp } = require('firebase/app');
 const { getAuth, createUserWithEmailAndPassword } = require('firebase/auth');
 const { getFirestore, doc, setDoc } = require('firebase/firestore');
 
+// TODO: Replace with your Firebase configuration
 const firebaseConfig = {
-  apiKey: 'AIzaSyBlREsqDtURVdUKvlEtKcPvV9UAeWclFSA',
-  authDomain: 'top-clean-service.firebaseapp.com',
-  projectId: 'top-clean-service',
-  storageBucket: 'top-clean-service.firebasestorage.app',
-  messagingSenderId: '957049267039',
-  appId: '1:957049267039:web:7c93cd378ad87f4e4e4cea',
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'your-project.firebaseapp.com',
+  projectId: 'your-project-id',
+  storageBucket: 'your-project.firebasestorage.app',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID',
 };
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// YENİ ADMİN BİLGİLERİ - İSTEDİĞİN GİBİ DEĞİŞTİR
-const ADMIN_EMAIL = 'admin@topclean.de';
-const ADMIN_PASSWORD = 'TopClean2025!';
+// TODO: Replace with your admin credentials
+const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_PASSWORD = 'YourSecurePassword123!';
 
 async function createAdmin() {
   try {

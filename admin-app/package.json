@@ -4,8 +4,8 @@
   "description": "TOP Clean Service - Admin Panel",
   "main": "electron/main.js",
   "author": {
-    "name": "TOP Clean Service",
-    "email": "admin@topclean-service.de"
+    "name": "Your Name",
+    "email": "your-email@example.com"
   },
   "scripts": {
     "dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5174 concurrently -k \"vite --port 5174\" \"wait-on http://localhost:5174 && electron .\"",
@@ -18,9 +18,9 @@
   "license": "MIT",
   "type": "commonjs",
   "build": {
-    "appId": "de.topclean-service.admin",
-    "productName": "TOP Clean Admin",
-    "copyright": "Copyright © 2025 TOP Clean Service",
+    "appId": "com.yourcompany.admin",
+    "productName": "Admin Panel",
+    "copyright": "Copyright © 2025 Your Company",
     "directories": {
       "output": "dist-installer",
       "buildResources": "build"
@@ -37,14 +37,14 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "TOP-Clean-Admin-Setup-${version}.${ext}"
+      "artifactName": "Admin-Panel-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "TOP Clean Admin",
+      "shortcutName": "Admin Panel",
       "license": "build/license.txt",
       "differentialPackage": false,
       "installerLanguages": ["de", "en"],

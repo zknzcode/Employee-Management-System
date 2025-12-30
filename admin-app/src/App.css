@@ -2017,10 +2017,26 @@ select:focus {
   color: #64748b;
 }
 
+.support-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.support-section {
+  margin-bottom: 0;
+}
+
 .support-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .support-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .support-item {
@@ -2028,104 +2044,135 @@ select:focus {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 16px;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .support-item--pending {
   border-left: 4px solid #f59e0b;
-  background: linear-gradient(90deg, #fffbeb 0%, #ffffff 5%);
+  background: linear-gradient(90deg, #fffbeb 0%, #ffffff 8%);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
 }
 
 .support-item--resolved {
   border-left: 4px solid #10b981;
-  opacity: 0.8;
+  background: linear-gradient(90deg, #ecfdf5 0%, #ffffff 8%);
+  opacity: 0.85;
 }
 
 .support-item:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
 }
 
-.support-item-header {
+.support-item__header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #e2e8f0;
 }
 
 .support-item-user {
   flex: 1;
+  min-width: 0;
 }
 
 .support-user-name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: #0f172a;
   margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .support-user-meta {
   font-size: 12px;
   color: #64748b;
-}
-
-.support-item-date {
-  font-size: 12px;
-  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  margin-left: 12px;
-}
-
-.support-item-content {
-  margin-bottom: 16px;
 }
 
 .support-topic {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
   padding: 6px 12px;
-  background: #f1f5f9;
-  border-radius: 6px;
-  font-size: 13px;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
 }
 
 .support-topic-label {
   font-weight: 600;
-  color: #475569;
+  color: #64748b;
 }
 
 .support-topic-value {
   color: #0f172a;
-  font-weight: 500;
+  font-weight: 700;
 }
 
-.support-related-date {
+.support-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.support-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.support-status.resolved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.support-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.support-label {
-  font-weight: 600;
+  font-size: 12px;
   color: #64748b;
+  flex-wrap: wrap;
 }
 
-.support-value {
-  color: #0f172a;
+.support-date-created {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.support-affected-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 8px;
 }
 
 .support-message {
-  margin-top: 12px;
   padding: 12px;
   background: #f8fafc;
   border-radius: 8px;
   border-left: 3px solid #3b82f6;
+  margin-top: 4px;
 }
 
 .support-message-text {
@@ -2133,25 +2180,46 @@ select:focus {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  font-size: 13px;
+  margin-top: 6px;
 }
 
 .support-item-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
 }
 
-[dir="rtl"] .support-item-header {
+.support-admin-response {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-radius: 8px;
+  border-left: 3px solid #3b82f6;
+  font-size: 12px;
+  color: #1e40af;
+}
+
+.support-admin-response .support-label {
+  font-weight: 700;
+  color: #1e40af;
+  margin-right: 6px;
+}
+
+[dir="rtl"] .support-item__header {
   flex-direction: row-reverse;
-}
-
-[dir="rtl"] .support-item-date {
-  margin-left: 0;
-  margin-right: 12px;
 }
 
 [dir="rtl"] .support-item-actions {
   flex-direction: row-reverse;
+}
+
+[dir="rtl"] .support-admin-response .support-label {
+  margin-right: 0;
+  margin-left: 6px;
 }
 
 .report-item-user {

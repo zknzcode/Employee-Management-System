@@ -10,12 +10,12 @@ service cloud.firestore {
       return isSignedIn() &&
         (request.auth.token.admin == true ||
          request.auth.token.email in [
-           'admin@topclean-service.de',
-           'mert.kaya@topclean-service.de',
-           'info@blumeiraqstore.com'
+           // TODO: Add your admin emails here
+           'admin@example.com'
          ] ||
          request.auth.uid in [
-           'RcYxSflDcOdTaA1BRjnEfH9fPON2'
+           // TODO: Add your admin UIDs here
+           'YOUR_ADMIN_UID'
          ]);
     }
 

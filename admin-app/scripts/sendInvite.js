@@ -1,4 +1,4 @@
-// Tek seferlik mail gönderimi için: npm run send:invite -- --to hedef@ornek.com --link https://top-clean-1.web.app
+// Tek seferlik mail gönderimi için: npm run send:invite -- --to hedef@ornek.com --link https://your-app.web.app
 import 'dotenv/config'
 import nodemailer from 'nodemailer'
 
@@ -6,7 +6,7 @@ const args = process.argv.slice(2)
 const toIndex = args.indexOf('--to')
 const linkIndex = args.indexOf('--link')
 const to = toIndex >= 0 ? args[toIndex + 1] : null
-const link = linkIndex >= 0 ? args[linkIndex + 1] : 'https://top-clean-1.web.app'
+const link = linkIndex >= 0 ? args[linkIndex + 1] : 'https://your-app.web.app'
 
 if (!to) {
   console.error('Kullanım: npm run send:invite -- --to hedef@mail.com --link https://...')
@@ -25,11 +25,11 @@ async function main() {
   })
 
   await transporter.sendMail({
-    from: `"${process.env.FROM_NAME || 'TOP Clean'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    from: `"${process.env.FROM_NAME || 'Your App'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
     to,
-    subject: 'TOP Clean daveti',
-    text: `Merhaba,\n\nDavet bağlantınız: ${link}\n\nSelamlar,\nTOP Clean`,
-    html: `<p>Merhaba,</p><p>Davet bağlantınız: <a href="${link}">${link}</a></p><p>Selamlar,<br/>TOP Clean</p>`,
+    subject: 'Your App daveti',
+    text: `Merhaba,\n\nDavet bağlantınız: ${link}\n\nSelamlar,\nYour App`,
+    html: `<p>Merhaba,</p><p>Davet bağlantınız: <a href="${link}">${link}</a></p><p>Selamlar,<br/>Your App</p>`,
   })
 
   console.log('Gönderildi ->', to)
@@ -39,6 +39,9 @@ main().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+
+
+
 
 
 

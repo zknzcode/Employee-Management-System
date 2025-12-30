@@ -38,8 +38,10 @@ type SupportRequest = {
   userEmail?: string
   topic: 'wrong_report' | 'wrong_leave' | 'reset_account' | 'change_device' | 'other'
   relatedDate?: string
+  affectedDate?: string
   message: string
   status: 'pending' | 'resolved'
+  adminResponse?: string
   createdAt?: Timestamp
   resolvedAt?: Timestamp
 }
@@ -144,14 +146,15 @@ type LeaveRequest = {
   createdAt?: Timestamp
 }
 
+// TODO: Replace with your Firebase configuration
 const firebaseConfig = {
-  apiKey: 'AIzaSyBlREsqDtURVdUKvlEtKcPvV9UAeWclFSA',
-  authDomain: 'top-clean-service.firebaseapp.com',
-  projectId: 'top-clean-service',
-  storageBucket: 'top-clean-service.firebasestorage.app',
-  messagingSenderId: '957049267039',
-  appId: '1:957049267039:web:7c93cd378ad87f4e4e4cea',
-  measurementId: 'G-10S3SVSR86',
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'your-project.firebaseapp.com',
+  projectId: 'your-project-id',
+  storageBucket: 'your-project.firebasestorage.app',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId: 'YOUR_APP_ID',
+  measurementId: 'YOUR_MEASUREMENT_ID',
 }
 
 const app = initializeApp(firebaseConfig)
@@ -166,6 +169,42 @@ const formatDecimalHours = (decimalHours: number) => {
   return `${hours}:${minutes.toString().padStart(2, '0')}`
 }
 
+// Süreyi formatla (dakika cinsinden)
+const formatDuration = (minutes: number, lang: Lang) => {
+  if (minutes < 1) {
+    return lang === 'de' ? '<1 Min' : '<1 دقيقة'
+  }
+  if (minutes < 60) {
+    return `${Math.round(minutes)} ${lang === 'de' ? 'Min' : 'دقيقة'}`
+  }
+  const hours = Math.floor(minutes / 60)
+  const mins = Math.round(minutes % 60)
+  if (mins === 0) {
+    return `${hours} ${lang === 'de' ? 'Std' : 'ساعة'}`
+  }
+  return `${hours} ${lang === 'de' ? 'Std' : 'ساعة'} ${mins} ${lang === 'de' ? 'Min' : 'دقيقة'}`
+}
+
+// Konumda kalınan süreyi hesapla
+const calculateLocationDuration = (currentLoc: any, nextLoc: any | null) => {
+  if (!nextLoc) return null // Son konum
+  
+  const currentTime = currentLoc.timestamp?.toDate 
+    ? currentLoc.timestamp.toDate().getTime() 
+    : (currentLoc.capturedAt ? new Date(currentLoc.capturedAt).getTime() : null)
+  
+  const nextTime = nextLoc.timestamp?.toDate 
+    ? nextLoc.timestamp.toDate().getTime() 
+    : (nextLoc.capturedAt ? new Date(nextLoc.capturedAt).getTime() : null)
+  
+  if (!currentTime || !nextTime) return null
+  
+  const durationMs = nextTime - currentTime
+  const durationMinutes = durationMs / (1000 * 60)
+  
+  return durationMinutes
+}
+
 // Tarihi günden başlayacak şekilde formatla: 2025-12-28 -> 28.12.2025
 const formatDate = (dateStr: string): string => {
   if (!dateStr || !dateStr.includes('-')) return dateStr
@@ -175,7 +214,7 @@ const formatDate = (dateStr: string): string => {
 
 const copy: Record<Lang, any> = {
   de: {
-    title: 'TOP Clean Admin',
+    title: 'Admin Panel',
     subtitle: 'Einladungen & Geräteverwaltung',
     loginTitle: 'Admin Login',
     email: 'E-Mail',
@@ -195,7 +234,6 @@ const copy: Record<Lang, any> = {
     requests: 'Registrierungsanfragen',
     approve: 'Genehmigen',
     name: 'Name',
-    note: 'Notiz',
     deviceId: 'Gerät',
     personnel: 'Personal',
     search: 'Suchen',
@@ -226,13 +264,9 @@ const copy: Record<Lang, any> = {
     reports: 'Berichte',
     closeTab: 'Schließen',
     monthlyTotal: 'Monatliche Zusammenfassung',
-    totalWorkHours: 'Gesamtarbeitsstunden',
     totalOvertime: 'Gesamtüberstunden',
     totalCombined: 'Gesamt (inkl. Überstunden)',
     currentMonth: 'Aktueller Monat',
-    workDays: 'Arbeitstage',
-    leaveDays: 'Urlaubstage',
-    offDays: 'Freie Tage',
     editProfile: 'Profil bearbeiten',
     saveChanges: 'Speichern',
     cancel: 'Abbrechen',
@@ -335,6 +369,7 @@ const copy: Record<Lang, any> = {
     supportResolved: 'Anfrage als gelöst markiert',
     supportViewPersonnel: 'Personel anzeigen',
     supportRelatedDate: 'Betroffenes Datum',
+    adminResponse: 'Admin-Antwort',
     clearSupportHistory: 'Verlauf löschen',
     clearSupportHistoryConfirm: 'Möchten Sie alle gelösten Support-Anfragen wirklich löschen?',
     supportHistoryCleared: 'Verlauf erfolgreich gelöscht',
@@ -381,6 +416,12 @@ const copy: Record<Lang, any> = {
     refreshLocation: 'Standort aktualisieren',
     locationHistory: 'Standortverlauf',
     liveTracking: 'Live-Tracking',
+    playMapRecording: 'Kartenaufzeichnung abspielen',
+    pauseMap: 'Pause',
+    resumeMap: 'Fortsetzen',
+    playbackSpeed: 'Wiedergabegeschwindigkeit',
+    mapPlayback: 'Kartenwiedergabe',
+    noLocationData: 'Keine Standortdaten für diesen Tag',
     deleteAllReports: 'Alle Berichte löschen',
     deleteSelectedReports: 'Ausgewählte Berichte löschen',
     selectAll: 'Alle auswählen',
@@ -396,7 +437,7 @@ const copy: Record<Lang, any> = {
     autoCalculated: '(Automatisch)',
   },
   ar: {
-    title: 'TOP Clean Admin',
+    title: 'Admin Panel',
     subtitle: 'دعوات وإدارة الأجهزة',
     loginTitle: 'تسجيل دخول المدير',
     email: 'البريد الإلكتروني',
@@ -416,7 +457,6 @@ const copy: Record<Lang, any> = {
     requests: 'طلبات التسجيل',
     approve: 'موافقة',
     name: 'الاسم',
-    note: 'ملاحظة',
     deviceId: 'معرّف الجهاز',
     personnel: 'الموظفون',
     search: 'بحث',
@@ -447,13 +487,9 @@ const copy: Record<Lang, any> = {
     reports: 'التقارير',
     closeTab: 'إغلاق',
     monthlyTotal: 'ملخص الشهر',
-    totalWorkHours: 'إجمالي ساعات العمل',
     totalOvertime: 'إجمالي الساعات الإضافية',
     totalCombined: 'الإجمالي (شامل الإضافي)',
     currentMonth: 'الشهر الحالي',
-    workDays: 'أيام العمل',
-    leaveDays: 'أيام الإجازة',
-    offDays: 'أيام الراحة',
     editProfile: 'تعديل الملف الشخصي',
     saveChanges: 'حفظ',
     cancel: 'إلغاء',
@@ -556,6 +592,7 @@ const copy: Record<Lang, any> = {
     supportResolved: 'تم تمييز الطلب كحل',
     supportViewPersonnel: 'عرض الموظف',
     supportRelatedDate: 'التاريخ المعني',
+    adminResponse: 'رد المشرف',
     clearSupportHistory: 'مسح السجل',
     clearSupportHistoryConfirm: 'هل تريد حقًا حذف جميع طلبات الدعم المحلولة؟',
     supportHistoryCleared: 'تم مسح السجل بنجاح',
@@ -602,6 +639,12 @@ const copy: Record<Lang, any> = {
     refreshLocation: 'تحديث الموقع',
     locationHistory: 'سجل الموقع',
     liveTracking: 'تتبع مباشر',
+    playMapRecording: 'تشغيل تسجيل الخريطة',
+    pauseMap: 'إيقاف مؤقت',
+    resumeMap: 'استئناف',
+    playbackSpeed: 'سرعة التشغيل',
+    mapPlayback: 'تشغيل الخريطة',
+    noLocationData: 'لا توجد بيانات موقع لهذا اليوم',
     deleteAllReports: 'حذف جميع التقارير',
     deleteSelectedReports: 'حذف التقارير المحددة',
     selectAll: 'تحديد الكل',
@@ -649,8 +692,9 @@ function App() {
       setTimeout(() => setLangAnimating(false), 300)
     }, 150)
   }
-  const adminWhitelistEmails = ['admin@topclean-service.de', 'mert.kaya@topclean-service.de', 'info@blumeiraqstore.com', 'admin@topclean.de']
-  const adminWhitelistUids = ['RcYxSflDcOdTaA1BRjnEfH9fPON2', 'iLBDkB6aePhGHLV9QCjTOlVyE4A3']
+  // TODO: Replace with your admin whitelist emails and UIDs
+  const adminWhitelistEmails: string[] = [] // Add your admin emails here
+  const adminWhitelistUids: string[] = [] // Add your admin UIDs here
 
   const functions = useMemo(() => getFunctions(app, 'us-central1'), [])
   const sendInviteFn = useMemo(() => httpsCallable(functions, 'sendInvite'), [functions])
@@ -1163,11 +1207,43 @@ function App() {
     latitude: number
     longitude: number
     title: string
+    address?: string
+    startLocation?: LocationData | null
+    endLocation?: LocationData | null
   } | null>(null)
 
-  // Harita dialog'u aç
-  const openMapDialog = (lat: number, lng: number, title: string) => {
-    setMapDialog({ isOpen: true, latitude: lat, longitude: lng, title })
+  // Reverse geocoding - koordinatlardan adres al
+  const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+        headers: {
+          'User-Agent': 'Your App Name'
+        }
+      })
+      const data = await response.json()
+      if (data.address) {
+        // Adresi düzenle - önemli bilgileri birleştir
+        const parts: string[] = []
+        if (data.address.road) parts.push(data.address.road)
+        if (data.address.house_number) parts.push(data.address.house_number)
+        if (parts.length === 0 && data.address.suburb) parts.push(data.address.suburb)
+        if (parts.length === 0 && data.address.neighbourhood) parts.push(data.address.neighbourhood)
+        if (data.address.postcode) parts.push(data.address.postcode)
+        if (data.address.city || data.address.town || data.address.village) {
+          parts.push(data.address.city || data.address.town || data.address.village)
+        }
+        return parts.length > 0 ? parts.join(', ') : data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      }
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    } catch (error) {
+      console.error('Reverse geocoding error:', error)
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+    }
+  }
+
+  const openMapDialog = async (lat: number, lng: number, title: string) => {
+    const address = await getAddressFromCoordinates(lat, lng)
+    setMapDialog({ isOpen: true, latitude: lat, longitude: lng, title, address })
   }
 
   // Harita dialog'u kapat
@@ -1225,6 +1301,7 @@ function App() {
   const [locationTracking, setLocationTracking] = useState<Map<string, any>>(new Map())
   const [locationHistory, setLocationHistory] = useState<Map<string, any[]>>(new Map()) // deviceId -> locations array
   const [selectedPersonnelForTracking, setSelectedPersonnelForTracking] = useState<string | null>(null)
+  const trackingDialogMapRef = useRef<{ map: any; marker: any; polyline: any } | null>(null)
   const [trackingMapDialog, setTrackingMapDialog] = useState<{
     isOpen: boolean
     deviceId: string
@@ -1232,9 +1309,12 @@ function App() {
   } | null>(null)
   
   // Harita ref'leri (her personel için) - Leaflet kullanıyoruz
-  const mapRefs = useRef<Map<string, { map: any; marker: any; polyline: any }>>(new Map())
+  const mapRefs = useRef<Map<string, { map: any; marker: any; polyline: any; labels?: any[] }>>(new Map())
+  
+  // Harita açık/kapalı durumları (her mapId için)
+  const [mapOpenStates, setMapOpenStates] = useState<Map<string, boolean>>(new Map())
 
-  // Harita oluşturma ve güncelleme - aktif personel için
+  // Harita oluşturma - sadece bir kez, harita yoksa
   useEffect(() => {
     // Leaflet yüklendi mi kontrol et
     if (typeof (window as any).L === 'undefined') {
@@ -1252,23 +1332,60 @@ function App() {
     
     const mapId = `map-${user.deviceId}`
     
+    // Harita zaten var mı kontrol et
+    const existingMapData = mapRefs.current.get(mapId)
+    if (existingMapData && existingMapData.map) {
+      // Harita zaten var, oluşturma yapma
+      return
+    }
+    
     const initializeMap = () => {
       const mapElement = document.getElementById(mapId)
       if (!mapElement) {
-        // Element henüz render edilmemiş, kısa bir süre bekle
-        setTimeout(initializeMap, 100)
+        // Element henüz render edilmemiş (CollapsibleMap kapalı olabilir), kısa bir süre bekle
+        setTimeout(initializeMap, 500)
         return
       }
       
-      // Harita zaten oluşturulmuş mu kontrol et
-      let mapData = mapRefs.current.get(user.deviceId!)
+      // Element görünür mü kontrol et
+      if (mapElement.offsetParent === null || mapElement.offsetHeight === 0) {
+        // Element görünür değil, bekle
+        setTimeout(initializeMap, 500)
+        return
+      }
+      
+      // currentLocation'ı fonksiyonun başında tanımla (tüm bloklarda kullanılacak)
+      const currentLocation = locationTracking.get(user.deviceId!)
+      const center: [number, number] = currentLocation 
+        ? [Number(currentLocation.latitude), Number(currentLocation.longitude)]
+        : [52.5200, 13.4050] // Berlin default
+      
+      // Harita zaten oluşturulmuş mu kontrol et (mapId ile)
+      let mapData = mapRefs.current.get(mapId)
+      
+      // DOM element'inin zaten bir Leaflet haritasına sahip olup olmadığını kontrol et
+      if ((mapElement as any)._leaflet_id) {
+        // Element zaten bir harita tarafından kullanılıyor
+        // mapRefs'te mevcut harita var mı kontrol et
+        if (mapData && mapData.map) {
+          // Mevcut haritayı kullandık, güncelleme yapılacak
+          return
+        }
+        // mapRefs'te yoksa, element'i temizle ve yeniden oluştur
+        // Leaflet'in internal state'ini temizlemek için element'i yeniden oluştur
+        const parent = mapElement.parentNode
+        const nextSibling = mapElement.nextSibling
+        const newElement = document.createElement('div')
+        newElement.id = mapId
+        newElement.className = mapElement.className
+        newElement.style.cssText = mapElement.style.cssText
+        parent?.removeChild(mapElement)
+        parent?.insertBefore(newElement, nextSibling)
+        // Yeni element ile devam et
+        return initializeMap()
+      }
       
       if (!mapData || !mapData.map) {
-        // Yeni harita oluştur
-        const currentLocation = locationTracking.get(user.deviceId!)
-        const center: [number, number] = currentLocation 
-          ? [Number(currentLocation.latitude), Number(currentLocation.longitude)]
-          : [52.5200, 13.4050] // Berlin default
         
         const map = L.map(mapElement).setView(center, currentLocation ? 17 : 10)
         
@@ -1278,19 +1395,19 @@ function App() {
           maxZoom: 19,
         }).addTo(map)
         
-        // Marker oluştur
+        // Marker oluştur - İnsan şeklinde
         const marker = L.marker(center, {
           title: `${user.name || user.email}`,
         }).addTo(map)
         
-        // Marker için özel icon (mavi daire)
-        const blueIcon = L.divIcon({
-          className: 'custom-marker',
-          html: '<div style="background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
+        // Marker için özel icon (insan emoji)
+        const personIcon = L.divIcon({
+          className: 'custom-marker-person',
+          html: '<div style="font-size: 32px; text-align: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🧍</div>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32], // Alt kısmından tuttur
         })
-        marker.setIcon(blueIcon)
+        marker.setIcon(personIcon)
         
         // Polyline oluştur
         const polyline = L.polyline([], {
@@ -1299,8 +1416,8 @@ function App() {
           opacity: 1.0,
         }).addTo(map)
         
-        mapData = { map, marker, polyline }
-        mapRefs.current.set(user.deviceId!, mapData)
+        mapData = { map, marker, polyline, labels: [] }
+        mapRefs.current.set(mapId, mapData)
         
         // Harita boyutlarını güncelle
         setTimeout(() => {
@@ -1308,37 +1425,135 @@ function App() {
         }, 100)
       }
       
-      // Konumları güncelle - Canlı GPS takibi
-      const history = locationHistory.get(user.deviceId!) || []
-      const currentLocation = locationTracking.get(user.deviceId!)
-      
-      if (currentLocation && mapData.map && mapData.marker) {
+      // Harita oluşturuldu, konum güncellemeleri ayrı bir useEffect'te yapılacak
+    }
+    
+    initializeMap()
+  }, [activeTabId, tabs, users]) // locationTracking ve locationHistory'yi kaldırdık - sadece harita oluşturma için
+  
+  // Konum güncellemeleri - harita zaten varsa sadece güncelle
+  useEffect(() => {
+    // Leaflet yüklendi mi kontrol et
+    if (typeof (window as any).L === 'undefined') {
+      return
+    }
+    
+    const L = (window as any).L
+    
+    const activeTab = tabs.find((t) => t.id === activeTabId)
+    if (activeTab?.type !== 'personnel-detail' || !activeTab.userId) return
+    
+    const user = users.find((u) => u.id === activeTab.userId)
+    if (!user || !user.deviceId) return
+    
+    const mapId = `map-${user.deviceId}`
+    
+    // Harita var mı kontrol et
+    const mapData = mapRefs.current.get(mapId)
+    if (!mapData || !mapData.map) {
+      // Harita yok, güncelleme yapma
+      return
+    }
+    
+    // Konumları güncelle - Canlı GPS takibi
+    const history = locationHistory.get(user.deviceId!) || []
+    const currentLocation = locationTracking.get(user.deviceId!)
+    
+    if (currentLocation && mapData.map && mapData.marker) {
         const position: [number, number] = [Number(currentLocation.latitude), Number(currentLocation.longitude)]
         
-        // Marker'ı yumuşak bir şekilde güncelle (canlı hareket)
+        // Marker'ı yumuşak bir şekilde güncelle (canlı hareket - GPS gibi)
         const currentMarkerPos = mapData.marker.getLatLng()
         if (currentMarkerPos) {
-          // Eğer konum değiştiyse yumuşak animasyon
+          // Her zaman güncelle (canlı takip için)
           const distance = mapData.map.distance(currentMarkerPos, position)
-          if (distance > 5) { // 5 metreden fazla hareket varsa
-            mapData.marker.setLatLng(position)
-            // Marker'ı takip et ama zoom seviyesini koru
+          if (distance > 1) { // 1 metreden fazla hareket varsa güncelle
+            // Yumuşak animasyon ile marker'ı hareket ettir
+            mapData.marker.setLatLng(position, { animate: true, duration: 0.5 })
+            // Haritayı da yumuşak bir şekilde takip ettir
             if (mapData.map.getZoom() >= 15) {
-              mapData.map.panTo(position, { animate: true, duration: 1.0 })
+              mapData.map.panTo(position, { animate: true, duration: 0.5 })
             }
           }
         } else {
           mapData.marker.setLatLng(position)
         }
         
-        // Polyline'ı güncelle (tüm konum geçmişi - canlı rota)
-        const path: [number, number][] = history
-          .map((loc) => [Number(loc.latitude), Number(loc.longitude)])
-        
-        // Mevcut konumu da ekle
-        if (path.length === 0 || path[path.length - 1][0] !== position[0] || path[path.length - 1][1] !== position[1]) {
-          path.push(position)
+        // Eski label'ları temizle
+        if (!mapData.labels) {
+          mapData.labels = []
+        } else {
+          mapData.labels.forEach((label: any) => {
+            if (label && mapData.map) {
+              mapData.map.removeLayer(label)
+            }
+          })
+          mapData.labels = []
         }
+        
+        // Tüm konumları birleştir
+        const allLocations = [...history]
+        if (currentLocation) {
+          allLocations.push(currentLocation)
+        }
+        
+        // Her konum için süre hesapla ve label ekle
+        allLocations.forEach((loc, index) => {
+          if (index < allLocations.length - 1) {
+            const nextLoc = allLocations[index + 1]
+            const duration = calculateLocationDuration(loc, nextLoc)
+            
+            if (duration !== null && duration > 0) {
+              const locPosition: [number, number] = [Number(loc.latitude), Number(loc.longitude)]
+              const durationText = formatDuration(duration, lang)
+              
+              // Label marker oluştur - Marker'ın hemen altında
+              const labelText = durationText
+              const labelWidth = labelText.length * 7 + 16 // Yaklaşık genişlik
+              
+              const labelIcon = L.divIcon({
+                className: 'location-duration-label',
+                html: `<div style="
+                  background: rgba(59, 130, 246, 0.95);
+                  color: white;
+                  padding: 4px 8px;
+                  border-radius: 12px;
+                  font-size: 11px;
+                  font-weight: 600;
+                  white-space: nowrap;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+                  border: 2px solid white;
+                  text-align: center;
+                  min-width: ${labelWidth}px;
+                ">${labelText}</div>`,
+                iconSize: [labelWidth, 24],
+                iconAnchor: [labelWidth / 2, 0], // Üstten ortalanmış
+              })
+              
+              const labelMarker = L.marker(locPosition, {
+                icon: labelIcon,
+                zIndexOffset: 1000,
+              }).addTo(mapData.map)
+              
+              // Label'ı marker'ın hemen altına yerleştir (latitude offset)
+              const zoom = mapData.map.getZoom()
+              const latOffset = zoom > 15 ? 0.00008 : (zoom > 12 ? 0.00015 : 0.0003) // Zoom seviyesine göre offset
+              labelMarker.setLatLng([
+                locPosition[0] - latOffset, // Marker'ın altına
+                locPosition[1]
+              ])
+              
+              if (!mapData.labels) {
+                mapData.labels = []
+              }
+              mapData.labels.push(labelMarker)
+            }
+          }
+        })
+        
+        // Polyline'ı güncelle (tüm konum geçmişi - canlı rota)
+        const path: [number, number][] = allLocations
+          .map((loc) => [Number(loc.latitude), Number(loc.longitude)])
         
         if (path.length > 0) {
           mapData.polyline?.setLatLngs(path)
@@ -1365,10 +1580,120 @@ function App() {
         // Konum yoksa haritayı varsayılan merkeze ayarla
         mapData.map.setView([52.5200, 13.4050], 10)
       }
+  }, [activeTabId, tabs, users, locationTracking, locationHistory, lang]) // Konum güncellemeleri için
+
+  // Tracking Dialog haritası için useEffect
+  useEffect(() => {
+    if (!trackingMapDialog?.isOpen) {
+      if (trackingDialogMapRef.current) {
+        if (trackingDialogMapRef.current.map) {
+          trackingDialogMapRef.current.map.remove()
+        }
+        trackingDialogMapRef.current = null
+      }
+      return
     }
-    
-    initializeMap()
-  }, [activeTabId, tabs, users, locationTracking, locationHistory])
+
+    if (typeof (window as any).L === 'undefined') {
+      return
+    }
+
+    const L = (window as any).L
+    const location = locationTracking.get(trackingMapDialog.deviceId)
+    const history = locationHistory.get(trackingMapDialog.deviceId) || []
+
+    const initializeDialogMap = () => {
+      const mapElement = document.getElementById('tracking-dialog-map')
+      if (!mapElement) {
+        setTimeout(initializeDialogMap, 100)
+        return
+      }
+
+      if (!trackingDialogMapRef.current || !trackingDialogMapRef.current.map) {
+        const center: [number, number] = location
+          ? [Number(location.latitude), Number(location.longitude)]
+          : [52.5200, 13.4050]
+
+        const map = L.map(mapElement).setView(center, location ? 17 : 10)
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+        }).addTo(map)
+
+        const marker = L.marker(center, {
+          title: trackingMapDialog.personnelName,
+        }).addTo(map)
+
+        const personIcon = L.divIcon({
+          className: 'custom-marker-person',
+          html: '<div style="font-size: 32px; text-align: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🧍</div>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+        })
+        marker.setIcon(personIcon)
+
+        const polyline = L.polyline([], {
+          color: '#3b82f6',
+          weight: 3,
+          opacity: 1.0,
+        }).addTo(map)
+
+        trackingDialogMapRef.current = { map, marker, polyline }
+
+        setTimeout(() => {
+          map.invalidateSize()
+        }, 100)
+      }
+
+      if (location && trackingDialogMapRef.current) {
+        const position: [number, number] = [Number(location.latitude), Number(location.longitude)]
+
+        const currentMarkerPos = trackingDialogMapRef.current.marker.getLatLng()
+        if (currentMarkerPos) {
+          const distance = trackingDialogMapRef.current.map.distance(currentMarkerPos, position)
+          if (distance > 1) {
+            trackingDialogMapRef.current.marker.setLatLng(position, { animate: true, duration: 0.5 })
+            if (trackingDialogMapRef.current.map.getZoom() >= 15) {
+              trackingDialogMapRef.current.map.panTo(position, { animate: true, duration: 0.5 })
+            }
+          }
+        } else {
+          trackingDialogMapRef.current.marker.setLatLng(position)
+        }
+
+        const path: [number, number][] = history
+          .map((loc) => [Number(loc.latitude), Number(loc.longitude)])
+
+        if (path.length === 0 || path[path.length - 1][0] !== position[0] || path[path.length - 1][1] !== position[1]) {
+          path.push(position)
+        }
+
+        if (path.length > 0) {
+          trackingDialogMapRef.current.polyline?.setLatLngs(path)
+
+          if (path.length > 1) {
+            const bounds = L.latLngBounds(path)
+            if (trackingDialogMapRef.current.map.getZoom() < 15) {
+              trackingDialogMapRef.current.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 18 })
+            } else {
+              if (!bounds.contains(trackingDialogMapRef.current.map.getCenter())) {
+                trackingDialogMapRef.current.map.panTo(position, { animate: true, duration: 0.5 })
+              }
+            }
+          } else {
+            trackingDialogMapRef.current.map.setView(position, 17)
+          }
+        } else {
+          trackingDialogMapRef.current.map.setView(position, 17)
+        }
+      }
+    }
+
+    initializeDialogMap()
+  }, [trackingMapDialog, locationTracking, locationHistory])
+
+  // Günlük haritalar ve playback kaldırıldı - sadece başlangıç ve bitiş konumları gösteriliyor
 
   // Tüm raporları getir (filtreleme kaldırıldı)
   const getFilteredReports = () => {
@@ -2037,7 +2362,7 @@ function App() {
       // 3. Eğer silinmiş (rejected veya revoked) kayıtlar varsa, yeni davet oluşturulabilir
       // Bu durumda devam edebiliriz
       
-      const link = `https://top-clean-1.web.app/invite?email=${encodeURIComponent(form.email)}`
+      const link = `https://your-app.web.app/invite?email=${encodeURIComponent(form.email)}`
       const docRef = doc(collection(db, 'invites'))
       await setDoc(docRef, {
         email: emailLower,
@@ -3181,32 +3506,31 @@ function App() {
                 const user = users.find((u) => u.deviceId === req.deviceId)
                 return (
                   <div key={req.id} className="support-item support-item--pending">
-                    <div className="support-item-header">
+                    <div className="support-item__header">
                       <div className="support-item-user">
                         <div className="support-user-name">{req.userName || req.userEmail || user?.name || user?.email || req.deviceId}</div>
-                        <div className="support-user-meta">
-                          {req.userEmail || user?.email || ''} • {req.deviceId?.slice(0, 8)}...
+                        <div className="support-meta">
+                          <span className="support-user-meta">{req.userEmail || user?.email || ''} • {req.deviceId?.slice(0, 8)}...</span>
+                          <span className="support-date-created">
+                            {req.createdAt ? formatDate(req.createdAt.toDate().toISOString().slice(0, 10)) : '-'}
+                          </span>
                         </div>
                       </div>
-                      <div className="support-item-date">
-                        {req.createdAt ? formatDate(req.createdAt.toDate().toISOString().slice(0, 10)) : '-'}
-                      </div>
+                      <div className="support-status pending">{t.supportStatusPending}</div>
                     </div>
-                    <div className="support-item-content">
-                      <div className="support-topic">
-                        <span className="support-topic-label">{t.supportTopic}:</span>
-                        <span className="support-topic-value">{getTopicLabel(req.topic)}</span>
+                    <div className="support-topic">
+                      <span className="support-topic-label">{t.supportTopic}:</span>
+                      <span className="support-topic-value">{getTopicLabel(req.topic)}</span>
+                    </div>
+                    {(req.relatedDate || req.affectedDate) && (
+                      <div className="support-affected-date">
+                        <span className="support-label">{t.supportRelatedDate}:</span>
+                        <span className="support-value">{formatDate(req.relatedDate || req.affectedDate || '')}</span>
                       </div>
-                      {req.relatedDate && (
-                        <div className="support-related-date">
-                          <span className="support-label">{t.supportRelatedDate}:</span>
-                          <span className="support-value">{formatDate(req.relatedDate)}</span>
-                        </div>
-                      )}
-                      <div className="support-message">
-                        <span className="support-label">{t.supportMessage}:</span>
-                        <div className="support-message-text">{req.message}</div>
-                      </div>
+                    )}
+                    <div className="support-message">
+                      <span className="support-label">{t.supportMessage}:</span>
+                      <div className="support-message-text">{req.message}</div>
                     </div>
                     <div className="support-item-actions">
                       <button
@@ -3250,33 +3574,38 @@ function App() {
                 const user = users.find((u) => u.deviceId === req.deviceId)
                 return (
                   <div key={req.id} className="support-item support-item--resolved">
-                    <div className="support-item-header">
+                    <div className="support-item__header">
                       <div className="support-item-user">
                         <div className="support-user-name">{req.userName || req.userEmail || user?.name || user?.email || req.deviceId}</div>
-                        <div className="support-user-meta">
-                          {req.userEmail || user?.email || ''} • {req.deviceId?.slice(0, 8)}...
+                        <div className="support-meta">
+                          <span className="support-user-meta">{req.userEmail || user?.email || ''} • {req.deviceId?.slice(0, 8)}...</span>
+                          <span className="support-date-created">
+                            {req.resolvedAt ? formatDate(req.resolvedAt.toDate().toISOString().slice(0, 10)) : '-'}
+                          </span>
                         </div>
                       </div>
-                      <div className="support-item-date">
-                        {req.resolvedAt ? formatDate(req.resolvedAt.toDate().toISOString().slice(0, 10)) : '-'}
-                      </div>
+                      <div className="support-status resolved">{t.supportStatusResolved}</div>
                     </div>
-                    <div className="support-item-content">
-                      <div className="support-topic">
-                        <span className="support-topic-label">{t.supportTopic}:</span>
-                        <span className="support-topic-value">{getTopicLabel(req.topic)}</span>
-                      </div>
-                      {req.relatedDate && (
-                        <div className="support-related-date">
-                          <span className="support-label">{t.supportRelatedDate}:</span>
-                          <span className="support-value">{formatDate(req.relatedDate)}</span>
-                        </div>
-                      )}
-                      <div className="support-message">
-                        <span className="support-label">{t.supportMessage}:</span>
-                        <div className="support-message-text">{req.message}</div>
-                      </div>
+                    <div className="support-topic">
+                      <span className="support-topic-label">{t.supportTopic}:</span>
+                      <span className="support-topic-value">{getTopicLabel(req.topic)}</span>
                     </div>
+                    {(req.relatedDate || req.affectedDate) && (
+                      <div className="support-affected-date">
+                        <span className="support-label">{t.supportRelatedDate}:</span>
+                        <span className="support-value">{formatDate(req.relatedDate || req.affectedDate || '')}</span>
+                      </div>
+                    )}
+                    <div className="support-message">
+                      <span className="support-label">{t.supportMessage}:</span>
+                      <div className="support-message-text">{req.message}</div>
+                    </div>
+                    {req.adminResponse && (
+                      <div className="support-admin-response">
+                        <span className="support-label">{t.adminResponse}:</span>
+                        <span>{req.adminResponse}</span>
+                      </div>
+                    )}
                     <div className="support-item-actions">
                       <button
                         className="btn ghost small"
@@ -3290,6 +3619,163 @@ function App() {
               })}
             </div>
           </section>
+        )}
+      </div>
+    )
+  }
+
+  // Açılır/Kapanır Harita Component'i
+  const CollapsibleMap = ({ title, mapId, defaultOpen = false }: { title: string; mapId: string; defaultOpen?: boolean }) => {
+    // Parent component'teki state'i kullan (yeniden render'da kaybolmaz)
+    const isOpen = mapOpenStates.get(mapId) ?? defaultOpen
+    const mapContainerRef = useRef<HTMLDivElement>(null)
+    
+    const toggleMap = () => {
+      setMapOpenStates((prev) => {
+        const newMap = new Map(prev)
+        const currentState = prev.get(mapId) ?? defaultOpen
+        newMap.set(mapId, !currentState)
+        return newMap
+      })
+    }
+    
+    // İlk render'da defaultOpen değerini set et
+    useEffect(() => {
+      if (!mapOpenStates.has(mapId)) {
+        setMapOpenStates((prev) => {
+          const newMap = new Map(prev)
+          newMap.set(mapId, defaultOpen)
+          return newMap
+        })
+      }
+    }, [mapId, defaultOpen])
+    
+    // Harita açıldığında oluştur
+    useEffect(() => {
+      if (!isOpen) {
+        return
+      }
+      
+      // Kısa bir gecikme ile harita oluştur (DOM'un render edilmesi için)
+      const timer = setTimeout(() => {
+        if (typeof (window as any).L === 'undefined') {
+          return
+        }
+        
+        const L = (window as any).L
+        const mapElement = document.getElementById(mapId)
+        if (!mapElement) {
+          return
+        }
+        
+        // Harita zaten oluşturulmuş mu kontrol et
+        let mapData = mapRefs.current.get(mapId)
+        
+        // DOM element'inin zaten bir Leaflet haritasına sahip olup olmadığını kontrol et
+        if ((mapElement as any)._leaflet_id) {
+          // Element zaten bir harita tarafından kullanılıyor
+          // mapRefs'te mevcut harita var mı kontrol et
+          if (mapData && mapData.map) {
+            // Harita zaten var, sadece boyutunu güncelle
+            setTimeout(() => {
+              mapData.map.invalidateSize()
+            }, 300)
+            return
+          }
+          // mapRefs'te yoksa, element'i temizle ve yeniden oluştur
+          // Leaflet'in internal state'ini temizlemek için element'i yeniden oluştur
+          const parent = mapElement.parentNode
+          const nextSibling = mapElement.nextSibling
+          const newElement = document.createElement('div')
+          newElement.id = mapId
+          newElement.className = mapElement.className
+          newElement.style.cssText = mapElement.style.cssText
+          parent?.removeChild(mapElement)
+          parent?.insertBefore(newElement, nextSibling)
+          // Yeni element ile devam et (recursive call yapmayalım, sadece return edelim)
+          return
+        }
+        
+        if (mapData && mapData.map) {
+          // Harita zaten var, sadece boyutunu güncelle
+          setTimeout(() => {
+            mapData.map.invalidateSize()
+          }, 300)
+          return
+        }
+        
+        // Yeni harita oluştur
+        const center: [number, number] = [52.5200, 13.4050] // Default center
+        const map = L.map(mapId, {
+          preferCanvas: false,
+        }).setView(center, 10)
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19,
+        }).addTo(map)
+        
+        const marker = L.marker(center).addTo(map)
+        const personIcon = L.divIcon({
+          className: 'custom-marker-person',
+          html: '<div style="font-size: 24px; text-align: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">🧍</div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 24],
+        })
+        marker.setIcon(personIcon)
+        
+        const polyline = L.polyline([], {
+          color: '#3b82f6',
+          weight: 3,
+          opacity: 0.8,
+        }).addTo(map)
+        
+        mapRefs.current.set(mapId, { map, marker, polyline, labels: [] })
+        
+        // Harita oluşturulduktan sonra boyutunu güncelle
+        setTimeout(() => {
+          map.invalidateSize()
+        }, 300)
+      }, 300)
+      
+      return () => clearTimeout(timer)
+    }, [isOpen, mapId])
+    
+    return (
+      <div className="collapsible-map-container">
+        <div 
+          className="collapsible-map-header"
+          onClick={toggleMap}
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            padding: '12px 16px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            border: '1px solid #e2e8f0',
+            marginBottom: isOpen ? '12px' : '0',
+          }}
+        >
+          <span style={{ fontWeight: 600, fontSize: '14px' }}>{title}</span>
+          <span style={{ fontSize: '18px', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+            ▼
+          </span>
+        </div>
+        {isOpen && (
+          <div 
+            ref={mapContainerRef}
+            id={mapId}
+            className="live-map"
+            style={{ 
+              width: '100%', 
+              height: '400px',
+              borderRadius: '8px', 
+              overflow: 'hidden', 
+              marginTop: '8px',
+            }}
+          />
         )}
       </div>
     )
@@ -3493,9 +3979,6 @@ function App() {
               const history = locationHistory.get(user.deviceId) || []
               const recentHistory = history.slice(0, 20).reverse() // Son 20 kayıt, en eskiden yeniye
               
-              console.log('📍 Personnel Detail - DeviceID:', user.deviceId)
-              console.log('📍 Personnel Detail - Current Location:', currentLocation)
-              console.log('📍 Personnel Detail - History Count:', history.length)
               
               if (!currentLocation && history.length === 0) {
                 return (
@@ -3512,18 +3995,12 @@ function App() {
               
               return (
                 <div className="location-tracking-detail">
-                  {/* Canlı Harita */}
-                  <div className="live-map-container">
-                    <div className="live-map-title">
-                      🗺️ {lang === 'de' ? 'Live-Karte' : 'خريطة مباشرة'}
-                    </div>
-                    <div 
-                      id={mapId}
-                      className="live-map"
-                      style={{ width: '100%', height: '600px', borderRadius: '8px', overflow: 'hidden' }}
-                    />
-                  </div>
-                  
+                  {/* Canlı Harita - Açılır/Kapanır */}
+                  <CollapsibleMap
+                    title={lang === 'de' ? '🗺️ Live-Karte' : '🗺️ خريطة مباشرة'}
+                    mapId={mapId}
+                    defaultOpen={false}
+                  />
                 </div>
               )
             })()}
@@ -3619,6 +4096,38 @@ function App() {
                         </button>
                       )}
                     </div>
+                  </div>
+                )}
+                
+                {/* Harita - Başlangıç ve Bitiş Konumları */}
+                {((r.startLocation && r.startLocation.latitude && r.startLocation.longitude) || 
+                  (r.endLocation && r.endLocation.latitude && r.endLocation.longitude)) && (
+                  <div style={{ marginTop: '12px' }}>
+                    <button
+                      className="btn ghost small"
+                      onClick={async () => {
+                        // Başlangıç ve bitiş konumlarını gösteren harita aç
+                        const startLoc = r.startLocation
+                        const endLoc = r.endLocation
+                        if (!startLoc && !endLoc) return
+                        
+                        // İlk konumu al (başlangıç varsa, yoksa bitiş)
+                        const centerLoc = startLoc || endLoc!
+                        const address = await getAddressFromCoordinates(centerLoc.latitude, centerLoc.longitude)
+                        setMapDialog({ 
+                          isOpen: true, 
+                          latitude: centerLoc.latitude, 
+                          longitude: centerLoc.longitude, 
+                          title: `${formatDate(r.date)} - ${lang === 'de' ? 'Arbeitsorte' : 'مواقع العمل'}`,
+                          address,
+                          startLocation: startLoc,
+                          endLocation: endLoc,
+                        })
+                      }}
+                      title={lang === 'de' ? 'Karte mit Start- und Endposition anzeigen' : 'عرض الخريطة مع موقع البداية والنهاية'}
+                    >
+                      🗺️ {lang === 'de' ? 'Karte anzeigen' : 'عرض الخريطة'}
+                    </button>
                   </div>
                 )}
                 
@@ -3720,12 +4229,15 @@ function App() {
                 style={{ border: 0, borderRadius: '8px' }}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${mapDialog.latitude},${mapDialog.longitude}&zoom=17`}
+                src={`https://www.google.com/maps/embed/v1/place?key=YOUR_GOOGLE_MAPS_API_KEY&q=${mapDialog.latitude},${mapDialog.longitude}&zoom=17`}
               />
             </div>
             <div className="map-dialog__footer">
               <div className="map-coords">
-                {mapDialog.latitude.toFixed(6)}, {mapDialog.longitude.toFixed(6)}
+                <div style={{ marginBottom: '8px', fontWeight: 600 }}>{mapDialog.address || `${mapDialog.latitude.toFixed(6)}, ${mapDialog.longitude.toFixed(6)}`}</div>
+                <div style={{ fontSize: '12px', color: '#6b7c92' }}>
+                  {mapDialog.latitude.toFixed(6)}, {mapDialog.longitude.toFixed(6)}
+                </div>
               </div>
               <button className="btn primary" onClick={closeMapDialog}>
                 {t.closeMap}
@@ -3738,7 +4250,7 @@ function App() {
       {/* Canlı Konum Takibi Harita Dialog */}
       {trackingMapDialog && trackingMapDialog.isOpen && (() => {
         const location = locationTracking.get(trackingMapDialog.deviceId)
-        if (!location) return null
+        const history = locationHistory.get(trackingMapDialog.deviceId) || []
         
         return (
           <div className="map-dialog-overlay" onClick={() => setTrackingMapDialog(null)}>
@@ -3748,34 +4260,37 @@ function App() {
                 <button className="map-dialog__close" onClick={() => setTrackingMapDialog(null)}>✕</button>
               </div>
               <div className="map-dialog__body">
-                <iframe
-                  title="Google Maps Live Tracking"
-                  width="100%"
-                  height="500"
-                  style={{ border: 0, borderRadius: '8px' }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${location.latitude},${location.longitude}&zoom=17`}
+                <div 
+                  id="tracking-dialog-map"
+                  style={{ width: '100%', height: '500px', borderRadius: '8px', overflow: 'hidden' }}
                 />
               </div>
               <div className="map-dialog__footer">
                 <div className="map-coords">
-                  {Number(location.latitude).toFixed(6)}, {Number(location.longitude).toFixed(6)}
-                  {location.accuracy && (
-                    <span style={{ marginLeft: '8px', fontSize: '12px', color: '#6b7c92' }}>
-                      (±{Math.round(location.accuracy)}m)
-                    </span>
+                  {location ? (
+                    <>
+                      {Number(location.latitude).toFixed(6)}, {Number(location.longitude).toFixed(6)}
+                      {location.accuracy && (
+                        <span style={{ marginLeft: '8px', fontSize: '12px', color: '#6b7c92' }}>
+                          (±{Math.round(location.accuracy)}m)
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span style={{ color: '#9ca3af' }}>{lang === 'de' ? 'Keine Position verfügbar' : 'لا يوجد موقع'}</span>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <a
-                    href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn primary"
-                  >
-                    {lang === 'de' ? 'In Google Maps öffnen' : 'فتح في خرائط Google'}
-                  </a>
+                  {location && (
+                    <a
+                      href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn primary"
+                    >
+                      {lang === 'de' ? 'In Google Maps öffnen' : 'فتح في خرائط Google'}
+                    </a>
+                  )}
                   <button className="btn ghost" onClick={() => setTrackingMapDialog(null)}>
                     {t.closeMap}
                   </button>
@@ -3785,6 +4300,8 @@ function App() {
           </div>
         )
       })()}
+
+      {/* Playback dialog kaldırıldı */}
     </div>
   )
 }
