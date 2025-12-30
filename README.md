@@ -579,7 +579,11 @@ Visit `http://localhost:5173` (or the port shown in terminal)
 
 ## License
 
-MIT License - feel free to use this project for your own purposes.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+**Important**: If you modify this software and use it as a network service (web application), you must make the source code of your modified version available to all users of that service under the same AGPL license.
+
+For more details, see the [LICENSE](LICENSE) file.
 
 ---
 
@@ -1168,7 +1172,11 @@ Terminalde gösterilen portu ziyaret edin (genellikle `http://localhost:5173`)
 
 ## Lisans
 
-MIT Lisansı - Bu projeyi kendi amaçlarınız için özgürce kullanabilirsiniz.
+Bu proje **GNU Affero General Public License v3.0 (AGPL-3.0)** lisansı altında lisanslanmıştır.
+
+**Önemli**: Bu yazılımı değiştirip bir ağ servisi (web uygulaması) olarak kullanırsanız, değiştirilmiş sürümünüzün kaynak kodunu aynı AGPL lisansı altında tüm kullanıcılara açık hale getirmelisiniz.
+
+Daha fazla detay için [LICENSE](LICENSE) dosyasına bakın.
 
 ---
 
